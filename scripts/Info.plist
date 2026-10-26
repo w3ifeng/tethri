@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.focuscompanion.mac</string>
+	<key>CFBundleName</key>
+	<string>Tethri</string>
+	<key>CFBundleDisplayName</key>
+	<string>Tethri</string>
+	<key>CFBundleIconFile</key>
+	<string>FocusIcon</string>
+	<key>CFBundleExecutable</key>
+	<string>FocusCompanion</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.1</string>
+	<key>CFBundleVersion</key>
+	<string>2</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Tethri reads Chrome’s active website address to recognize distractions and closes only captured distracting tabs after revalidation.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>CompanionBackendURL</key>
+	<string>https://br-dry-rain-b4v2l8ik-littlefocus.compute.c-6.us-east-2.aws.neon.tech</string>
+</dict>
+</plist>

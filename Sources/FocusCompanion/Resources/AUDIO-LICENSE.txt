@@ -1,0 +1,7 @@
+Study rain: "Rain (loopable)" by Ylmir, recording 3.
+Source: https://opengameart.org/content/rain-loopable
+Dedicated to the public domain under CC0 1.0 Universal:
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Modified for Tethri: low-rumble removal, softened high frequencies,
+quiet normalization and a seamless crossfade. Prepared with scripts/generate-rain.py.
