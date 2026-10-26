@@ -8,7 +8,7 @@ struct ChatMessage: Identifiable {
     let sender: Sender
     let text: String
     var policyStatus: String? = nil
-    var contextText: String { String(([text, policyStatus].compactMap { $0 }.joined(separator: "\nSession status: ")).prefix(1000)) }
+    var contextText: String { ConversationText.bounded([text, policyStatus].compactMap { $0 }.joined(separator: "\nSession status: "), utf16Limit: 1000) }
 }
 
 @MainActor final class AppModel: ObservableObject {
@@ -99,7 +99,7 @@ struct ChatMessage: Identifiable {
         let classification = (engine.active ? engine.rules : preferences.rules).classification(of: target)
         let category = engine.grants.contains(target) ? "Productive; study video allowed for this session" : classification.label
         // Use the existing bounded label contract; never send the full address or page content.
-        return "\(String(target.label.prefix(180))) (\(category))"
+        return "\(ConversationText.bounded(target.label, utf16Limit: 180)) (\(category))"
     }
     private func currentConversationTarget() async -> Target? {
         let foreground = NSWorkspace.shared.frontmostApplication
@@ -238,8 +238,8 @@ struct ChatMessage: Identifiable {
         }
     }
     func send() {
-        let message = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !busy, !message.isEmpty, message.count <= 1000 else { return }
+        let message = ConversationText.bounded(draft.trimmingCharacters(in: .whitespacesAndNewlines), utf16Limit: 1000)
+        guard !busy, !message.isEmpty else { return }
         let activeRequest = engine.active
         let session = conversationID
         guard let id = activeRequest ? engine.beginRequest(now: now) : UUID() else { return }
@@ -254,7 +254,7 @@ struct ChatMessage: Identifiable {
                 let context = await conversationContext()
                 guard !Task.isCancelled, requestIdentity == id, conversationID == session else { return }
                 let body = CompanionRequest(requestId: id, sessionId: session, interventionId: intervention, message: message,
-                                            recentConversation: Array(recent.suffix(6)), label: context, studyGoal: activeRequest ? engine.goal : goal,
+                                            recentConversation: Array(recent.suffix(6)), label: context, studyGoal: ConversationText.bounded(activeRequest ? engine.goal : goal, utf16Limit: 500),
                                             breakEligible: engine.breakAvailable, studyRemainingSeconds: activeRequest ? Int(ceil(engine.studyRemaining)) : preferences.rules.studyMinutes * 60, maxBreakMinutes: activeRequest ? engine.rules.breakMinutes : preferences.rules.breakMinutes,
                                             context: engine.conversationContext(now: now))
                 let response = try await withThrowingTaskGroup(of: Interpretation.self) { group in
@@ -290,7 +290,11 @@ struct ChatMessage: Identifiable {
             }
         }
     }
-    func choose(_ intent: Intent) { engine.fallback(intent, now: now); appendCompanion(engine.status); fallback = false; drain(); syncRain(); persist() }
+    func choose(_ intent: Intent) {
+        cancelConversationRequest()
+        engine.fallback(intent, now: now); appendCompanion(engine.status); fallback = false; notice = nil
+        drain(); syncRain(); persist()
+    }
     func endBreak() { engine.finishBreak(); appendCompanion(engine.status); drain(); syncRain(); persist() }
     private func appendCompanion(_ text: String, policyStatus: String? = nil) {
         guard messages.last?.text != text || messages.last?.sender != .companion || messages.last?.policyStatus != policyStatus else { return }

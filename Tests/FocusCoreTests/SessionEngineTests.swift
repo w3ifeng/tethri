@@ -150,6 +150,30 @@ final class SessionEngineTests: XCTestCase {
         XCTAssertTrue(e.requestFailed(id,now:2)); e.fallback(.breakRequest,now:3)
         XCTAssertFalse(e.onBreak); XCTAssertEqual(e.takePending().count,1)
     }
+    func testLocalReasonCannotGrantStudyAccessAfterQuestionDeadline() {
+        var e = engine(); let t = target(); e.observe(t, now: 0)
+        e.fallback(.studyException, now: 21)
+        XCTAssertTrue(e.grants.isEmpty)
+        XCTAssertNil(e.intervention)
+        XCTAssertEqual(e.takePending().count, 1)
+    }
+    func testLocalBreakRequestUsesCurrentFocusTime() {
+        var e = engine(); e.tick(now: 299)
+        e.fallback(.breakRequest, now: 300)
+        XCTAssertTrue(e.onBreak)
+        XCTAssertFalse(e.breakAvailable)
+        XCTAssertEqual(e.breakRemaining(now: 300), 300)
+    }
+    func testConversationLimitsMatchBackendWithoutSplittingCharacters() {
+        XCTAssertEqual(ConversationText.bounded("abc", utf16Limit: 2), "ab")
+        XCTAssertEqual(ConversationText.bounded("a🙂b", utf16Limit: 2), "a")
+        XCTAssertEqual(ConversationText.bounded("a🙂b", utf16Limit: 3), "a🙂")
+        let family = "👨‍👩‍👧‍👦"
+        XCTAssertEqual(ConversationText.bounded(family, utf16Limit: family.utf16.count - 1), "")
+        var e = engine()
+        e.start(rules: Rules(), goal: String(repeating: "🙂", count: 500), now: 0)
+        XCTAssertEqual(e.goal.utf16.count, 500)
+    }
     func testCancelledGeneralChatDoesNotBlockAnInterventionReply() {
         var e = engine()
         let old = e.beginRequest(now: 1)!

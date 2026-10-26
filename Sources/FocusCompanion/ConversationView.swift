@@ -75,14 +75,14 @@ struct ConversationBubble: View {
                     Color.clear.frame(height: 1).id("bottom")
                 }
             }.frame(minHeight: 42, maxHeight: .infinity)
-                .onChange(of: model.messages.count) { _ in proxy.scrollTo("bottom", anchor: .bottom) }
+                .onChange(of: model.messages.last?.id) { _ in proxy.scrollTo("bottom", anchor: .bottom) }
                 .onChange(of: model.busy) { _ in proxy.scrollTo("bottom", anchor: .bottom) }
                 .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
         }
     }
     private var composer: some View {
         HStack(alignment: .center, spacing: 10) {
-            TextField("Message…", text: $model.draft, axis: .vertical).lineLimit(1...3).textFieldStyle(.plain).font(.system(size: 12)).onSubmit { model.send() }.onChange(of: model.draft) { model.draft = String($0.prefix(1000)) }
+            TextField("Message…", text: $model.draft, axis: .vertical).lineLimit(1...3).textFieldStyle(.plain).font(.system(size: 12)).onSubmit { model.send() }.onChange(of: model.draft) { model.draft = ConversationText.bounded($0, utf16Limit: 1000) }
             Button { model.send() } label: {
                 Image(systemName: "paperplane.fill").font(.system(size: 14, weight: .medium)).foregroundStyle(.white.opacity(canSend ? 1 : 0.45)).frame(width: 35, height: 35).background(blue.opacity(canSend ? 1 : 0.35), in: Circle())
             }.buttonStyle(.plain).disabled(!canSend).accessibilityLabel("Send message")

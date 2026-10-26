@@ -77,6 +77,54 @@ test('database failures fail closed without calling Gemini', async () => {
     assert.deepEqual(await result.json(),{error:'service_unavailable'});
   } finally {globalThis.fetch=originalFetch;}
 });
+test('valid multilingual history fits the request body limit', async () => {
+  const r = registry();
+  const input = {...request(), message:'学'.repeat(1000), studyGoal:'学'.repeat(500),
+    recentConversation:Array.from({length:6}, () => ({role:'user',text:'学'.repeat(1000)}))};
+  assert.ok(new TextEncoder().encode(JSON.stringify(input)).length > 16384);
+  globalThis.fetch = async () => Response.json({candidates:[{content:{parts:[{text:JSON.stringify({intent:'chat',requestedBreakMinutes:null,reply:'Keep going.'})}]}}]});
+  try { assert.equal((await r.send('/v1/companion/interpret', input)).status, 200); }
+  finally { globalThis.fetch = originalFetch; }
+});
+test('oversized streaming bodies are cancelled before quotas or provider calls', async () => {
+  let reservations = 0, cancelled = false;
+  const handler = createHandler({GEMINI_API_KEY:'test-key'}, {async reserve(){ reservations++; return true; }});
+  const stream = new ReadableStream({
+    pull(controller) { controller.enqueue(new Uint8Array(8192)); },
+    cancel() { cancelled = true; }
+  });
+  const response = await handler(new Request('https://focus.test/v1/companion/interpret', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:stream, duplex:'half'
+  } as RequestInit));
+  assert.equal(response.status, 400);
+  assert.equal(cancelled, true);
+  assert.equal(reservations, 0);
+});
+test('malformed provider structures fail once without retrying or leaking payloads', async () => {
+  const malformed = [null, {}, {candidates:{}}, {candidates:[null]},
+    {candidates:[{content:{parts:{text:'private-provider-payload'}}}]},
+    {candidates:[{content:{parts:[null]}}]},
+    {candidates:[{content:{parts:[{text:42}]}}]}];
+  for (const payload of malformed) {
+    const r = registry(); let calls = 0;
+    globalThis.fetch = async () => { calls++; return Response.json(payload); };
+    try {
+      const response = await r.send('/v1/companion/interpret', request());
+      assert.equal(response.status, 503);
+      assert.deepEqual(await response.json(), {error:'invalid_response'});
+      assert.equal(calls, 1);
+    } finally { globalThis.fetch = originalFetch; }
+  }
+});
+test('invalid provider JSON is not retried as a network failure', async () => {
+  const r = registry(); let calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response('invalid-json', {headers:{'Content-Type':'application/json'}}); };
+  try {
+    const response = await r.send('/v1/companion/interpret', request());
+    assert.deepEqual(await response.json(), {error:'invalid_response'});
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = originalFetch; }
+});
 test('Gemini receives current context and history and its conversational reply is preserved', async () => {
   const r = registry();
   const input = {...request(), message:'Why do you keep asking about my work?', label:'github.com (Productive)',

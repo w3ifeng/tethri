@@ -1,5 +1,20 @@
 import Foundation
 
+/// Match the backend's UTF-16 string limits without splitting a visible character.
+public enum ConversationText {
+    public static func bounded(_ text: String, utf16Limit: Int) -> String {
+        var end = text.startIndex
+        var length = 0
+        while end < text.endIndex {
+            let next = text.index(after: end)
+            let count = text[end..<next].utf16.count
+            guard length + count <= utf16Limit else { break }
+            length += count; end = next
+        }
+        return String(text[..<end])
+    }
+}
+
 public enum Classification: String, Codable, CaseIterable {
     case productive, distracting, neutral
     public var label: String { self == .distracting ? "Unproductive" : rawValue.capitalized }

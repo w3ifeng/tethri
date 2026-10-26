@@ -10,12 +10,28 @@ async function body(request: Request): Promise<unknown> {
   // Bound streaming bodies too; Content-Length is not trusted.
   const reader = request.body?.getReader(); if (!reader) throw new Error('invalid');
   let length = 0; const chunks: Uint8Array[] = [];
-  while (true) { const {value, done} = await reader.read(); if (done) break; length += value.length; if (length > 16384) { await reader.cancel(); throw new Error('invalid'); } chunks.push(value); }
+  // The bounded text contract can exceed 16 KiB in UTF-8, especially with CJK history.
+  // 64 KiB also accommodates JSON escapes while retaining a hard streaming limit.
+  while (true) { const {value, done} = await reader.read(); if (done) break; length += value.length; if (length > 65536) { await reader.cancel(); throw new Error('invalid'); } chunks.push(value); }
   const bytes = new Uint8Array(length); let offset = 0; for (const c of chunks) { bytes.set(c,offset); offset += c.length; }
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 export interface QuotaEntry { scope: string; period: string; limit: number }
 export interface QuotaStore { reserve(entries: QuotaEntry[], signal: AbortSignal): Promise<boolean> }
+
+function providerText(raw: unknown): string | null {
+  if (!record(raw) || !Array.isArray(raw.candidates)) return null;
+  const candidate = raw.candidates[0];
+  if (!record(candidate) || !record(candidate.content) || !Array.isArray(candidate.content.parts)) return null;
+  const text: string[] = [];
+  for (const part of candidate.content.parts) {
+    if (!record(part)) return null;
+    if (part.thought === true) continue;
+    if (typeof part.text !== 'string') return null;
+    text.push(part.text);
+  }
+  return text.join('');
+}
 
 export function createHandler(env: Env, quotas: QuotaStore) {
   const service = new CompanionService(env, quotas);
@@ -69,10 +85,14 @@ class CompanionService {
           if ((response.status === 429 || response.status >= 500) && attempt === 0 && Date.now()-started < 6000) continue;
           break;
         }
-        const raw: unknown = await response.json();
-        if (!record(raw)) { category='invalid_response'; break; }
-        const candidates = raw.candidates as {content?:{parts?:{text?:string;thought?:boolean}[]}}[] | undefined;
-        const text = candidates?.[0]?.content?.parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') ?? '';
+        let raw: unknown;
+        try { raw = await response.json(); }
+        catch (error) {
+          if (!(error instanceof SyntaxError)) throw error;
+          category='invalid_response'; break;
+        }
+        const text = providerText(raw);
+        if (!record(raw) || text === null) { category='invalid_response'; break; }
         let parsed: unknown; try { parsed=JSON.parse(text); } catch { category='invalid_response'; break; }
         if (!validResponse(parsed)) { category='invalid_response'; break; }
         const usage = record(raw.usageMetadata) ? raw.usageMetadata : {};

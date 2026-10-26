@@ -40,10 +40,10 @@ public struct SessionEngine {
         } else { access = .none }
         return ConversationContext(sessionPhase: !active ? .idle : onBreak ? .break : .focus,
                                    breakRemainingSeconds: onBreak ? Int(ceil(breakRemaining(now: now))) : 0,
-                                   interventionLabel: target.map { String($0.label.prefix(255)) }, studyAccess: access)
+                                   interventionLabel: target.map { ConversationText.bounded($0.label, utf16Limit: 255) }, studyAccess: access)
     }
     public mutating func start(rules: Rules, goal: String, now: Double) {
-        self = SessionEngine(); self.rules = rules; self.rules.normalize(); self.goal = String(goal.prefix(500))
+        self = SessionEngine(); self.rules = rules; self.rules.normalize(); self.goal = ConversationText.bounded(goal, utf16Limit: 500)
         sessionID = UUID(); lastTick = now; status = "One small step. Let’s focus."
     }
     public mutating func end() { self = SessionEngine() }
@@ -136,6 +136,7 @@ public struct SessionEngine {
         return true
     }
     public mutating func fallback(_ intent: Intent, now: Double) {
+        tick(now: now)
         guard active else { return }
         intervention?.requestID = nil; chatRequest = nil
         decide(intent: intent, minutes: nil, reply: "", now: now)

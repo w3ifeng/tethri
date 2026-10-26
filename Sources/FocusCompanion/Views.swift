@@ -37,7 +37,7 @@ struct Dashboard: View {
     private var session: some View {
         VStack(alignment: .leading, spacing: 18) {
             group {
-                TextField("Study goal (optional)", text: $model.goal).textFieldStyle(.plain).font(.system(size: 13)).disabled(model.engine.active).onChange(of: model.goal) { model.goal = String($0.prefix(500)) }
+                TextField("Study goal (optional)", text: $model.goal).textFieldStyle(.plain).font(.system(size: 13)).disabled(model.engine.active).onChange(of: model.goal) { model.goal = ConversationText.bounded($0, utf16Limit: 500) }
             }
             SessionTimerView(model: model)
             Button { model.showBubble?() } label: { Label("Open chat", systemImage: "bubble.left").font(.system(size: 11)) }
